@@ -4,13 +4,14 @@ import { ApiErrors } from '@/lib/api/errors';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
-type RouteParams = { params: { postId: string } };
+type RouteParams = { params: Promise<{ postId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const { postId } = await params;
   const { uid, error } = await verifyAuth(request);
   if (error || !uid) return ApiErrors.unauthorized();
 
-  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(params.postId);
+  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(postId);
   const postSnap = await postRef.get();
   if (!postSnap.exists) return ApiErrors.notFound('글');
 
@@ -21,13 +22,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { postId } = await params;
   const { uid, error } = await verifyAuth(request);
   if (error || !uid) return ApiErrors.unauthorized();
 
   const body = await request.json();
   const { title, scenes, tags } = body;
 
-  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(params.postId);
+  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(postId);
   const postSnap = await postRef.get();
   if (!postSnap.exists) return ApiErrors.notFound('글');
 
@@ -41,14 +43,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const { postId } = await params;
   const { uid, error } = await verifyAuth(request);
   if (error || !uid) return ApiErrors.unauthorized();
 
-  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(params.postId);
+  const postRef = adminDb.collection('users').doc(uid).collection('posts').doc(postId);
   const postSnap = await postRef.get();
   if (!postSnap.exists) return ApiErrors.notFound('글');
 
-  // photos 서브컬렉션 삭제
   const photosSnap = await postRef.collection('photos').get();
   await Promise.all(photosSnap.docs.map((d) => d.ref.delete()));
 
