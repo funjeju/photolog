@@ -61,9 +61,13 @@ export async function POST(request: NextRequest) {
       });
     }
   } else {
+    const errorMessage = payload.errors
+      ?.map((e) => (typeof e === 'string' ? e : JSON.stringify(e)))
+      .join(', ') ?? type;
+    console.error('[webhook/remotion] render failed:', type, JSON.stringify(payload.errors));
     await videoDoc.ref.update({
       status: 'failed',
-      errorMessage: payload.errors?.join(', ') ?? type,
+      errorMessage,
       updatedAt: new Date(),
     });
   }
