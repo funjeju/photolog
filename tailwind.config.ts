@@ -87,7 +87,7 @@ const config: Config = {
         '2xl': '32px',
       },
       fontFamily: {
-        sans: ['Pretendard Variable', 'Pretendard', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-pretendard)', 'Pretendard Variable', 'Pretendard', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 2px 8px rgba(45, 42, 38, 0.04)',

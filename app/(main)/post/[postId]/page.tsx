@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client';
 import { toast } from 'sonner';
-import { Save, Video, Download, MapPin, Camera, Clock } from 'lucide-react';
+import { Save, Video, Download, MapPin, Camera, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { BGM_BY_CATEGORY, type BgmKey } from '@/lib/video/bgm';
 import type { Post, Scene } from '@/types/post';
 
 const SCENE_TYPE_LABELS: Record<string, string> = {
@@ -27,35 +32,47 @@ function SceneCard({ scene, onNarrationChange }: {
   scene: Scene;
   onNarrationChange: (id: number, text: string) => void;
 }) {
+  const [open, setOpen] = useState(true);
+
   return (
     <Card className="hover:-translate-y-0.5 transition-all duration-200">
       <CardContent className="p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="text-xs">
-            {SCENE_TYPE_LABELS[scene.type] ?? scene.type}
-          </Badge>
-          <span className="text-xs text-foreground-subtle">{scene.duration}초</span>
-        </div>
-
-        {scene.location && (
-          <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
-            <MapPin className="h-3 w-3" />
-            <span>{scene.location.placeName || scene.location.address}</span>
+        <button
+          className="flex items-center justify-between w-full"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              {SCENE_TYPE_LABELS[scene.type] ?? scene.type}
+            </Badge>
+            <span className="text-xs text-foreground-subtle">{scene.duration}초</span>
           </div>
+          {open ? <ChevronUp className="h-4 w-4 text-foreground-subtle" /> : <ChevronDown className="h-4 w-4 text-foreground-subtle" />}
+        </button>
+
+        {open && (
+          <>
+            {scene.location && (
+              <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                <MapPin className="h-3 w-3" />
+                <span>{scene.location.placeName || scene.location.address}</span>
+              </div>
+            )}
+
+            <Textarea
+              value={scene.narration}
+              onChange={(e) => onNarrationChange(scene.id, e.target.value)}
+              className="min-h-[120px] text-sm leading-relaxed"
+            />
+
+            <div className="pt-1">
+              <p className="text-xs text-foreground-subtle mb-1">영상 자막</p>
+              <p className="text-sm font-medium text-foreground bg-background-subtle rounded px-2 py-1">
+                {scene.subtitle}
+              </p>
+            </div>
+          </>
         )}
-
-        <Textarea
-          value={scene.narration}
-          onChange={(e) => onNarrationChange(scene.id, e.target.value)}
-          className="min-h-[120px] text-sm leading-relaxed"
-        />
-
-        <div className="pt-1">
-          <p className="text-xs text-foreground-subtle mb-1">영상 자막</p>
-          <p className="text-sm font-medium text-foreground bg-background-subtle rounded px-2 py-1">
-            {scene.subtitle}
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
@@ -66,6 +83,9 @@ export default function PostPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [bgm, setBgm] = useState<BgmKey>('a_stroll');
+  const [format, setFormat] = useState<'9:16' | '16:9' | '1:1'>('9:16');
 
   useEffect(() => {
     async function load() {
@@ -103,7 +123,7 @@ export default function PostPage() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: post.title, scenes: post.scenes }),
       });
-      if (!res.ok) throw new Error('저장 실패');
+      if (!res.ok) throw new Error();
       toast.success('저장됐어요!');
     } catch {
       toast.error('저장에 실패했어요.');
@@ -112,9 +132,32 @@ export default function PostPage() {
     }
   }
 
+  async function handleGenerateVideo() {
+    if (!post) return;
+    setGenerating(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/videos/create', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.postId, bgm, format }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message ?? '영상 생성에 실패했어요.');
+        return;
+      }
+      toast.success('영상 생성이 시작됐어요! 내 영상 탭에서 확인하세요.');
+    } catch {
+      toast.error('영상 생성에 실패했어요.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   if (loading) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6">
         <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           {[1, 2, 3].map((i) => <Skeleton key={i} className="h-48 w-full" />)}
@@ -133,7 +176,7 @@ export default function PostPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6 animate-fade-in">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 animate-fade-in">
       {/* 본문 */}
       <div className="space-y-4">
         <Input
@@ -156,21 +199,78 @@ export default function PostPage() {
       <div className="space-y-4">
         <Card className="sticky top-20">
           <CardContent className="p-5 space-y-3">
+            {/* 저장 */}
             <Button className="w-full gap-2" onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4" />
               {saving ? '저장 중...' : '저장하기'}
             </Button>
-            <Button variant="outline" className="w-full gap-2" disabled>
-              <Video className="h-4 w-4" />
-              영상 생성
-            </Button>
-            <Button variant="ghost" className="w-full gap-2" disabled>
-              <Download className="h-4 w-4" />
-              내려받기
-            </Button>
 
             <Separator />
 
+            {/* 영상 옵션 */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground-muted">영상 포맷</p>
+              <Select value={format} onValueChange={(v) => setFormat(v as typeof format)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="9:16">9:16 릴스/숏츠</SelectItem>
+                  <SelectItem value="16:9">16:9 유튜브</SelectItem>
+                  <SelectItem value="1:1">1:1 인스타</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <p className="text-xs font-medium text-foreground-muted">BGM</p>
+              <Select value={bgm} onValueChange={(v) => setBgm(v as BgmKey)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs">☕ Lo-Fi (카페·일상)</SelectLabel>
+                    {BGM_BY_CATEGORY.lofi.map((t) => (
+                      <SelectItem key={t.key} value={t.key} className="text-xs">{t.label}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs">🎸 어쿠스틱 (다이어리)</SelectLabel>
+                    {BGM_BY_CATEGORY.acoustic.map((t) => (
+                      <SelectItem key={t.key} value={t.key} className="text-xs">{t.label}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs">🎬 시네마틱 (여행·풍경)</SelectLabel>
+                    {BGM_BY_CATEGORY.cinematic.map((t) => (
+                      <SelectItem key={t.key} value={t.key} className="text-xs">{t.label}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleGenerateVideo}
+              disabled={generating}
+            >
+              <Video className="h-4 w-4" />
+              {generating ? '생성 요청 중...' : '영상 생성'}
+            </Button>
+
+            {post.videoId && (
+              <Link href="/mypage/videos">
+                <Button variant="ghost" className="w-full gap-2 text-xs">
+                  <Download className="h-4 w-4" />
+                  내 영상 보러 가기
+                </Button>
+              </Link>
+            )}
+
+            <Separator />
+
+            {/* 글 정보 */}
             <div className="space-y-2 text-xs text-foreground-muted">
               <div className="flex items-center gap-2">
                 <Camera className="h-3 w-3" />

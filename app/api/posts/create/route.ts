@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
       scenes: generated.scenes,
       status: 'completed',
       totalPhotos: photoUrls.length,
+      thumbnailUrl: photoUrls[0] ?? null,
       primaryLocation: primaryLocation ?? null,
       dateRange: {
         start: sorted[0]?.exif.capturedAt ?? now,

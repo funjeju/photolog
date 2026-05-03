@@ -1,41 +1,47 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
 export type OcrResult = {
   text: string;
   items: Array<{ text: string; confidence: number }>;
 };
 
-export async function extractOCR(imageUrl: string): Promise<OcrResult | null> {
-  const secret = process.env.CLOVA_OCR_SECRET;
-  const invokeUrl = process.env.CLOVA_OCR_INVOKE_URL;
+const OCR_PROMPT = `이 이미지에서 보이는 모든 텍스트를 정확히 추출해줘.
+간판, 메뉴판, 영수증, 표지판, 라벨 등 어떤 형태든 포함해.
+JSON 형식으로만 응답해: { "lines": ["텍스트1", "텍스트2", ...] }
+텍스트가 없으면: { "lines": [] }`;
 
-  if (!secret || !invokeUrl) return null;
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  const buffer = await res.arrayBuffer();
+  return Buffer.from(buffer).toString('base64');
+}
+
+export async function extractOCR(imageUrl: string): Promise<OcrResult | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
 
   try {
-    const body = {
-      version: 'V2',
-      requestId: `req_${Date.now()}`,
-      timestamp: Date.now(),
-      images: [{ format: 'jpg', name: 'photo', url: imageUrl }],
-    };
-
-    const res = await fetch(invokeUrl, {
-      method: 'POST',
-      headers: {
-        'X-OCR-SECRET': secret,
-        'Content-Type': 'application/json',
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash-lite',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
       },
-      body: JSON.stringify(body),
     });
 
-    if (!res.ok) return null;
-    const data = await res.json();
+    const imageData = await fetchImageAsBase64(imageUrl);
+    const result = await model.generateContent([
+      OCR_PROMPT,
+      { inlineData: { mimeType: 'image/jpeg', data: imageData } },
+    ]);
 
-    const fields = data.images?.[0]?.fields ?? [];
-    const items = fields.map((f: { inferText: string; confidence: number }) => ({
-      text: f.inferText,
-      confidence: f.confidence,
-    }));
+    const parsed = JSON.parse(result.response.text()) as { lines: string[] };
+    const lines: string[] = parsed.lines ?? [];
 
-    const text = items.map((i: { text: string }) => i.text).join(' ');
+    const items = lines.map((t) => ({ text: t, confidence: 0.95 }));
+    const text = lines.join(' ');
+
     return { text, items };
   } catch {
     return null;

@@ -35,6 +35,7 @@ export type Post = {
   status: PostStatus;
   scenes: Scene[];
   totalPhotos: number;
+  thumbnailUrl?: string;
   primaryLocation?: string;
   dateRange: {
     start: Timestamp;
