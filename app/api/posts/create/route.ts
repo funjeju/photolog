@@ -3,6 +3,8 @@ import { verifyAuth } from '@/lib/api/auth';
 import { ApiErrors } from '@/lib/api/errors';
 import { adminDb } from '@/lib/firebase/admin';
 import { extractExif } from '@/lib/exif/parser';
+
+export const maxDuration = 300;
 import { reverseGeocode } from '@/lib/maps/kakao';
 import { extractOCR } from '@/lib/ocr/clova';
 import { describeImage } from '@/lib/ai/gemini-vision';

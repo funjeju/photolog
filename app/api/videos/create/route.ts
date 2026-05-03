@@ -8,6 +8,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import type { VideoFormat, VideoScene } from '@/remotion/types';
 import type { BgmKey } from '@/lib/video/bgm';
 
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   const { uid, error } = await verifyAuth(request);
   if (error || !uid) return ApiErrors.unauthorized();

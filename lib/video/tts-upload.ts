@@ -7,33 +7,28 @@ export async function generateAndUploadTts(
   postId: string,
   voice: TtsVoice = 'Kore',
 ): Promise<string[]> {
-  const results = await Promise.all(
-    scenes.map(async (scene) => {
-      try {
-        const tts = await generateSpeech(scene.narration, voice);
-        if (!tts) return '';
+  const results: string[] = [];
+  for (const scene of scenes) {
+    try {
+      const tts = await generateSpeech(scene.narration, voice);
+      if (!tts) { results.push(''); continue; }
 
-        const wavBuffer = Buffer.from(tts.audioBase64, 'base64');
-        const path = `users/${uid}/posts/${postId}/tts/scene_${scene.id}.wav`;
-        const bucket = adminStorage.bucket();
-        const file = bucket.file(path);
+      const wavBuffer = Buffer.from(tts.audioBase64, 'base64');
+      const path = `users/${uid}/posts/${postId}/tts/scene_${scene.id}.wav`;
+      const bucket = adminStorage.bucket();
+      const file = bucket.file(path);
 
-        await file.save(wavBuffer, {
-          metadata: { contentType: 'audio/wav' },
-        });
+      await file.save(wavBuffer, { metadata: { contentType: 'audio/wav' } });
 
-        // 서명된 URL (1시간) → Lambda 렌더 시간 내 충분
-        const [url] = await file.getSignedUrl({
-          action: 'read',
-          expires: Date.now() + 60 * 60 * 1000,
-        });
-
-        return url;
-      } catch {
-        return '';
-      }
-    }),
-  );
+      const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 60 * 60 * 1000,
+      });
+      results.push(url);
+    } catch {
+      results.push('');
+    }
+  }
 
   return results;
 }
