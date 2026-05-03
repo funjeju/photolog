@@ -30,6 +30,7 @@ export async function renderVideoOnLambda(props: VideoProps, webhookUrl?: string
     inputProps: props,
     codec: 'h264',
     imageFormat: 'jpeg',
+    framesPerLambda: 300,
     maxRetries: 1,
     privacy: 'public',
     outName: `render_${Date.now()}.mp4`,
