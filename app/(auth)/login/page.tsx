@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Leaf, Chrome } from 'lucide-react';
@@ -9,36 +9,26 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { signInWithGoogle, handleGoogleRedirectResult, signInWithEmail } from '@/lib/firebase/auth';
+import { signInWithGoogle, signInWithEmail } from '@/lib/firebase/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [emailLoading, setEmailLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Google redirect 결과 처리
-  useEffect(() => {
-    setGoogleLoading(true);
-    handleGoogleRedirectResult()
-      .then((user) => {
-        if (user) router.push('/dashboard');
-      })
-      .catch(() => {
-        toast.error('Google 로그인에 실패했어요. 다시 시도해주세요.');
-      })
-      .finally(() => {
-        setGoogleLoading(false);
-      });
-  }, [router]);
+  const [emailLoading, setEmailLoading] = useState(false);
 
   async function handleGoogle() {
     setGoogleLoading(true);
     try {
-      await signInWithGoogle(); // redirect — 페이지 이동됨
-    } catch {
-      toast.error('Google 로그인을 시작할 수 없어요.');
+      await signInWithGoogle();
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        toast.error('Google 로그인에 실패했어요. 다시 시도해주세요.');
+      }
+    } finally {
       setGoogleLoading(false);
     }
   }
@@ -60,7 +50,6 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md shadow-hover">
       <CardContent className="p-8">
-        {/* 로고 */}
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100 mb-3">
             <Leaf className="h-6 w-6 text-primary-500" />
@@ -69,7 +58,6 @@ export default function LoginPage() {
           <p className="text-sm text-foreground-muted mt-1">사진으로 만드는 블로그 & 영상</p>
         </div>
 
-        {/* Google 로그인 */}
         <Button
           variant="outline"
           className="w-full border-2 border-border bg-white text-foreground hover:bg-background-subtle gap-3 mb-4"
@@ -80,14 +68,12 @@ export default function LoginPage() {
           {googleLoading ? 'Google 연결 중...' : 'Google로 계속하기'}
         </Button>
 
-        {/* 구분선 */}
         <div className="flex items-center gap-3 mb-4">
           <Separator className="flex-1" />
           <span className="text-xs text-foreground-subtle">또는</span>
           <Separator className="flex-1" />
         </div>
 
-        {/* 이메일 로그인 */}
         <form onSubmit={handleEmail} className="space-y-3">
           <Input
             type="email"

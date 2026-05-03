@@ -1,6 +1,5 @@
 import {
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -11,16 +10,9 @@ import { auth, googleProvider, db } from './client';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 export async function signInWithGoogle() {
-  await signInWithRedirect(auth, googleProvider);
-}
-
-export async function handleGoogleRedirectResult() {
-  const result = await getRedirectResult(auth);
-  if (result?.user) {
-    await ensureUserDocument(result.user, 'google');
-    return result.user;
-  }
-  return null;
+  const result = await signInWithPopup(auth, googleProvider);
+  await ensureUserDocument(result.user, 'google');
+  return result.user;
 }
 
 export async function signUpWithEmail(email: string, password: string, displayName: string) {

@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useRouter } from 'next/navigation';
-import { Upload, ImagePlus, CheckCircle, Circle, Loader2, X } from 'lucide-react';
+import { Upload, ImagePlus, CheckCircle, Circle, Loader2, X, MapPin, Camera, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import exifr from 'exifr';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -27,6 +27,8 @@ type PhotoFile = {
   preview: string;
   capturedAt: Date | null;
   hasExif: boolean;
+  hasGps: boolean;
+  cameraModel: string | null;
 };
 
 type Step = 1 | 2 | 3 | 4;
@@ -65,15 +67,20 @@ export default function UploadPage() {
       acceptedFiles.slice(0, 30).map(async (file) => {
         const preview = URL.createObjectURL(file);
         try {
-          const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude'] });
+          const exif = await exifr.parse(file, {
+            pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude', 'Make', 'Model'],
+          });
+          const model = exif?.Model ? String(exif.Model).trim() : (exif?.Make ? String(exif.Make).trim() : null);
           return {
             file,
             preview,
             capturedAt: exif?.DateTimeOriginal ? new Date(exif.DateTimeOriginal) : null,
             hasExif: !!exif?.DateTimeOriginal,
+            hasGps: !!(exif?.GPSLatitude && exif?.GPSLongitude),
+            cameraModel: model,
           };
         } catch {
-          return { file, preview, capturedAt: null, hasExif: false };
+          return { file, preview, capturedAt: null, hasExif: false, hasGps: false, cameraModel: null };
         }
       })
     );
@@ -219,29 +226,86 @@ export default function UploadPage() {
             </div>
           </div>
 
-          {/* 미리보기 */}
+          {/* 미리보기 + EXIF */}
           {photos.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs text-foreground-muted mb-3">
-                {photos.length}장 선택됨 (시간순 정렬)
-              </p>
-              <div className="grid grid-cols-5 gap-2">
-                {photos.map((photo, i) => (
-                  <div key={i} className="relative group aspect-square rounded-md overflow-hidden bg-background-subtle">
-                    <img
-                      src={photo.preview}
-                      alt={`photo-${i}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
-                      className="absolute top-1 right-1 h-4 w-4 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-2.5 w-2.5 text-white" />
-                    </button>
-                    <span className="absolute bottom-1 left-1 text-xs text-white bg-black/60 rounded px-1">
-                      {i + 1}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-foreground-muted">{photos.length}장 선택됨 (시간순 정렬)</p>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="flex items-center gap-1 text-primary-400">
+                    <CheckCircle className="h-3 w-3" />
+                    EXIF {photos.filter((p) => p.hasExif).length}장
+                  </span>
+                  {photos.filter((p) => !p.hasExif).length > 0 && (
+                    <span className="flex items-center gap-1 text-amber-500">
+                      <AlertTriangle className="h-3 w-3" />
+                      없음 {photos.filter((p) => !p.hasExif).length}장
                     </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {photos.map((photo, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      'relative rounded-xl overflow-hidden border-2 bg-white transition-all',
+                      photo.hasExif ? 'border-primary-200' : 'border-amber-200'
+                    )}
+                  >
+                    {/* 썸네일 */}
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <img
+                        src={photo.preview}
+                        alt={`photo-${i}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removePhoto(i); }}
+                        className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </button>
+                      <span className="absolute bottom-1.5 left-1.5 text-xs text-white bg-black/60 rounded px-1.5 py-0.5 font-medium">
+                        {i + 1}
+                      </span>
+                    </div>
+
+                    {/* EXIF 정보 */}
+                    <div className="p-2.5 space-y-1">
+                      {photo.hasExif ? (
+                        <>
+                          {photo.capturedAt && (
+                            <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                              <Clock className="h-3 w-3 flex-shrink-0 text-primary-300" />
+                              <span>
+                                {photo.capturedAt.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                                {' '}
+                                {photo.capturedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 text-xs">
+                            <MapPin className={cn('h-3 w-3 flex-shrink-0', photo.hasGps ? 'text-primary-300' : 'text-foreground-subtle')} />
+                            <span className={photo.hasGps ? 'text-foreground-muted' : 'text-foreground-subtle'}>
+                              {photo.hasGps ? 'GPS 있음' : 'GPS 없음'}
+                            </span>
+                          </div>
+                          {photo.cameraModel && (
+                            <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                              <Camera className="h-3 w-3 flex-shrink-0 text-primary-300" />
+                              <span className="truncate">{photo.cameraModel}</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                          <span>EXIF 없음 — 제외됩니다</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

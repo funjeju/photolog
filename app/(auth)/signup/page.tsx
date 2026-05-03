@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Leaf, Chrome } from 'lucide-react';
@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { signInWithGoogle, handleGoogleRedirectResult, signUpWithEmail } from '@/lib/firebase/auth';
+import { signInWithGoogle, signUpWithEmail } from '@/lib/firebase/auth';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,20 +19,17 @@ export default function SignupPage() {
   const [emailLoading, setEmailLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  useEffect(() => {
-    setGoogleLoading(true);
-    handleGoogleRedirectResult()
-      .then((user) => { if (user) router.push('/dashboard'); })
-      .catch(() => toast.error('Google 로그인에 실패했어요.'))
-      .finally(() => setGoogleLoading(false));
-  }, [router]);
-
   async function handleGoogle() {
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
-    } catch {
-      toast.error('Google 로그인을 시작할 수 없어요.');
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        toast.error('Google 로그인에 실패했어요.');
+      }
+    } finally {
       setGoogleLoading(false);
     }
   }

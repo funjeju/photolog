@@ -39,3 +39,5 @@ firebase-debug.log
 
 # Remotion
 remotion-output/
+
+.vercel
