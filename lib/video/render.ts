@@ -11,7 +11,7 @@ export type RenderResult = {
   bucketName: string;
 };
 
-export async function renderVideoOnLambda(props: VideoProps): Promise<RenderResult> {
+export async function renderVideoOnLambda(props: VideoProps, webhookUrl?: string): Promise<RenderResult> {
   const { renderMediaOnLambda } = await import('@remotion/lambda/client');
 
   const region = process.env.REMOTION_AWS_REGION as 'ap-northeast-2';
@@ -33,12 +33,7 @@ export async function renderVideoOnLambda(props: VideoProps): Promise<RenderResu
     maxRetries: 1,
     privacy: 'public',
     outName: `render_${Date.now()}.mp4`,
-    webhook: process.env.REMOTION_WEBHOOK_SECRET
-      ? {
-          url: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/remotion`,
-          secret: process.env.REMOTION_WEBHOOK_SECRET,
-        }
-      : undefined,
+    webhook: webhookUrl ? { url: webhookUrl, secret: '' } : undefined,
   });
 
   return { renderId, bucketName };

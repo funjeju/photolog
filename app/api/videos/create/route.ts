@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
 
   // Lambda 렌더 시작
   try {
-    const { renderId, bucketName } = await renderVideoOnLambda({ scenes, bgm, format, ttsUrls });
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/remotion?uid=${uid}&vid=${videoRef.id}`;
+    const { renderId, bucketName } = await renderVideoOnLambda({ scenes, bgm, format, ttsUrls }, webhookUrl);
 
     await videoRef.update({
       status: 'rendering',

@@ -21,18 +21,23 @@ export async function POST(request: NextRequest) {
 
   const { type, renderId, bucketName } = payload;
 
-  // renderId로 video 도큐먼트 찾기
-  const videosQuery = await adminDb
-    .collectionGroup('videos')
-    .where('renderId', '==', renderId)
-    .limit(1)
-    .get();
+  // URL 파라미터로 직접 조회 (인덱스 불필요)
+  const { searchParams } = new URL(request.url);
+  const uid = searchParams.get('uid');
+  const vid = searchParams.get('vid');
 
-  if (videosQuery.empty) {
-    return NextResponse.json({ ok: true }); // 무시
+  if (!uid || !vid) {
+    return NextResponse.json({ error: 'missing uid or vid' }, { status: 400 });
   }
 
-  const videoDoc = videosQuery.docs[0];
+  const videoRef = adminDb.collection('users').doc(uid).collection('videos').doc(vid);
+  const videoSnap = await videoRef.get();
+
+  if (!videoSnap.exists) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const videoDoc = { ref: videoRef, data: () => videoSnap.data()! };
 
   // 사용자가 중지한 영상은 덮어쓰지 않음
   if (videoDoc.data().status === 'cancelled') {
@@ -48,8 +53,8 @@ export async function POST(request: NextRequest) {
     });
 
     // post 도큐먼트에도 outputUrl 반영
-    const { postId, uid } = videoDoc.data();
-    if (uid && postId) {
+    const { postId } = videoDoc.data();
+    if (postId) {
       await adminDb.collection('users').doc(uid).collection('posts').doc(postId).update({
         videoOutputUrl: outputUrl,
         updatedAt: new Date(),
