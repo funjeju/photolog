@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     const sorted = photosData.sort(
       (a, b) => (a.exif.capturedAt?.getTime() ?? 0) - (b.exif.capturedAt?.getTime() ?? 0)
     );
-    const clusters = clusterByLocation(sorted, 50);
+    const clusters = clusterByLocation(sorted, 300);
 
     // LLM 글 생성
     const generated = await generatePost({ mode, tone: options.tone, clusters, title: options.title });

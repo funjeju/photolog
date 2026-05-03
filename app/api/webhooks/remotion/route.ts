@@ -5,8 +5,15 @@ import crypto from 'crypto';
 
 function verifyWebhookSignature(body: string, signature: string | null, secret: string): boolean {
   if (!signature) return false;
-  const expected = crypto.createHmac('sha512', secret).update(body).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  try {
+    const expected = crypto.createHmac('sha512', secret).update(body).digest('hex');
+    const sigBuf = Buffer.from(signature, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length === 0 || sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: NextRequest) {

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     };
   });
 
-  const clusters = clusterByLocation(photoDataList, 50);
+  const clusters = clusterByLocation(photoDataList, 300);
   const effectiveTone = tone ?? (mode === 'blog' ? '정보형' : '기본');
 
   const generated = await generatePost({ mode, tone: effectiveTone, clusters });

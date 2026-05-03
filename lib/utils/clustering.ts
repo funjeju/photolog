@@ -34,7 +34,7 @@ function haversineDistance(a: GPS, b: GPS): number {
   return R * c;
 }
 
-export function clusterByLocation(photos: PhotoData[], radiusMeters = 50): Cluster[] {
+export function clusterByLocation(photos: PhotoData[], radiusMeters = 300): Cluster[] {
   const sorted = [...photos].sort(
     (a, b) => (a.exif.capturedAt?.getTime() ?? 0) - (b.exif.capturedAt?.getTime() ?? 0)
   );
