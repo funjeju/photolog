@@ -2,19 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { collection, getDocs, orderBy, query, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, orderBy, query, onSnapshot, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client';
-import { Clapperboard, PenLine, Download, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Clapperboard, PenLine, Download, Clock, CheckCircle, AlertCircle, Loader2, XCircle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type VideoStatus = 'pending' | 'rendering' | 'completed' | 'failed';
+type VideoStatus = 'pending' | 'rendering' | 'completed' | 'failed' | 'cancelled';
 
 type VideoDoc = {
   videoId: string;
   postId: string;
+  uid: string;
   status: VideoStatus;
   bgm: string;
   format: string;
@@ -24,10 +26,11 @@ type VideoDoc = {
 };
 
 const STATUS_CONFIG: Record<VideoStatus, { label: string; icon: React.ReactNode; color: string }> = {
-  pending:   { label: '준비 중',  icon: <Clock className="h-3 w-3" />,       color: 'bg-sun-200 text-sun-300' },
-  rendering: { label: '렌더링 중', icon: <Loader2 className="h-3 w-3 animate-spin" />, color: 'bg-sky-200 text-sky-300' },
-  completed: { label: '완료',    icon: <CheckCircle className="h-3 w-3" />,  color: 'bg-primary-100 text-primary-400' },
-  failed:    { label: '실패',    icon: <AlertCircle className="h-3 w-3" />,  color: 'bg-red-50 text-red-400' },
+  pending:   { label: '준비 중',   icon: <Clock className="h-3 w-3" />,                       color: 'bg-sun-200 text-sun-300' },
+  rendering: { label: '렌더링 중', icon: <Loader2 className="h-3 w-3 animate-spin" />,        color: 'bg-sky-200 text-sky-300' },
+  completed: { label: '완료',      icon: <CheckCircle className="h-3 w-3" />,                 color: 'bg-primary-100 text-primary-400' },
+  failed:    { label: '실패',      icon: <AlertCircle className="h-3 w-3" />,                 color: 'bg-red-50 text-red-400' },
+  cancelled: { label: '중지됨',    icon: <XCircle className="h-3 w-3" />,                     color: 'bg-background-subtle text-foreground-subtle' },
 };
 
 const FORMAT_LABEL: Record<string, string> = {
@@ -37,11 +40,31 @@ const FORMAT_LABEL: Record<string, string> = {
 };
 
 function VideoCard({ video }: { video: VideoDoc }) {
+  const [cancelling, setCancelling] = useState(false);
+
   const ts = video.createdAt instanceof Timestamp
     ? video.createdAt.toDate()
     : new Date(video.createdAt as unknown as string);
   const dateStr = `${ts.getFullYear()}.${String(ts.getMonth() + 1).padStart(2, '0')}.${String(ts.getDate()).padStart(2, '0')}`;
-  const st = STATUS_CONFIG[video.status];
+  const st = STATUS_CONFIG[video.status] ?? STATUS_CONFIG.failed;
+  const isActive = video.status === 'rendering' || video.status === 'pending';
+
+  async function handleCancel() {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    setCancelling(true);
+    try {
+      await updateDoc(doc(db, `users/${uid}/videos/${video.videoId}`), {
+        status: 'cancelled',
+        updatedAt: new Date(),
+      });
+      toast.success('영상 생성을 중지했어요.');
+    } catch {
+      toast.error('중지에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   return (
     <Card className="hover:-translate-y-0.5 transition-all duration-200">
@@ -54,9 +77,7 @@ function VideoCard({ video }: { video: VideoDoc }) {
 
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}
-              >
+              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>
                 {st.icon}{st.label}
               </span>
               <Badge variant="secondary" className="text-xs">
@@ -72,15 +93,34 @@ function VideoCard({ video }: { video: VideoDoc }) {
             )}
           </div>
 
-          {/* 다운로드 */}
-          {video.status === 'completed' && video.outputUrl && (
-            <a href={video.outputUrl} target="_blank" rel="noopener noreferrer" download>
-              <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0">
-                <Download className="h-3.5 w-3.5" />
-                다운로드
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            {/* 다운로드 */}
+            {video.status === 'completed' && video.outputUrl && (
+              <a href={video.outputUrl} target="_blank" rel="noopener noreferrer" download>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Download className="h-3.5 w-3.5" />
+                  다운로드
+                </Button>
+              </a>
+            )}
+
+            {/* 중지 버튼 — 렌더링·대기 중일 때만 표시 */}
+            {isActive && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-foreground-subtle hover:text-red-500 hover:bg-red-50"
+                onClick={handleCancel}
+                disabled={cancelling}
+              >
+                {cancelling
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Square className="h-3.5 w-3.5 fill-current" />
+                }
+                중지
               </Button>
-            </a>
-          )}
+            )}
+          </div>
         </div>
 
         {/* 원본 글 링크 */}
@@ -102,7 +142,6 @@ export default function VideosPage() {
     const uid = auth.currentUser?.uid;
     if (!uid) { setLoading(false); return; }
 
-    // 렌더링 중인 영상이 있으면 실시간 구독
     const unsubscribe = onSnapshot(
       query(collection(db, `users/${uid}/videos`), orderBy('createdAt', 'desc')),
       (snap) => {
@@ -123,12 +162,12 @@ export default function VideosPage() {
         <p className="text-sm text-foreground-muted mt-1">생성한 숏폼 영상을 관리하세요</p>
       </div>
 
-      {/* 렌더링 중 배너 */}
       {rendering.length > 0 && (
         <div className="flex items-center gap-3 rounded-xl bg-sky-50 border border-sky-200 px-4 py-3">
           <Loader2 className="h-4 w-4 text-sky-400 animate-spin flex-shrink-0" />
           <p className="text-sm text-sky-600">
-            <span className="font-medium">{rendering.length}개</span> 영상이 렌더링 중이에요. 완료되면 자동으로 업데이트돼요.
+            <span className="font-medium">{rendering.length}개</span> 영상이 렌더링 중이에요.
+            완료되면 자동으로 업데이트돼요.
           </p>
         </div>
       )}

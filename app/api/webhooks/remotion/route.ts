@@ -49,6 +49,11 @@ export async function POST(request: NextRequest) {
 
   const videoDoc = videosQuery.docs[0];
 
+  // 사용자가 중지한 영상은 덮어쓰지 않음
+  if (videoDoc.data().status === 'cancelled') {
+    return NextResponse.json({ ok: true });
+  }
+
   if (type === 'success') {
     const outputUrl = payload.outputFile ?? getOutputUrl(bucketName, renderId);
     await videoDoc.ref.update({
