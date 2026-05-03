@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase/client';
 import { toast } from 'sonner';
-import { Save, Video, Download, MapPin, Camera, Clock, Mic, Layers, Clapperboard, Rocket } from 'lucide-react';
+import { Save, Video, Download, MapPin, Camera, Clock, Mic, Layers, Clapperboard, Rocket, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,6 +192,7 @@ export default function PostPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [bgm, setBgm] = useState<BgmKey>('a_stroll');
   const [format, setFormat] = useState<'9:16' | '16:9' | '1:1'>('9:16');
 
@@ -245,6 +246,36 @@ export default function PostPage() {
       toast.error('저장에 실패했어요.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    if (!post) return;
+    const targetMode = post.mode === 'blog' ? 'diary' : 'blog';
+    const targetLabel = targetMode === 'blog' ? '블로그' : '다이어리';
+    setRegenerating(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/posts/${postId}/regenerate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: targetMode }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      // 글 다시 로드
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        const snap = await (await import('firebase/firestore')).getDoc(
+          (await import('firebase/firestore')).doc(db, `users/${uid}/posts/${postId}`)
+        );
+        if (snap.exists()) setPost({ postId: snap.id, ...snap.data() } as Post);
+      }
+      toast.success(`${targetLabel} 형식으로 재생성됐어요!`);
+    } catch {
+      toast.error('재생성에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setRegenerating(false);
     }
   }
 
@@ -302,6 +333,25 @@ export default function PostPage() {
         <VideoGeneratingOverlay photos={photos} totalDuration={totalDuration} />
       )}
 
+      {regenerating && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col items-center justify-center gap-6 px-6">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-100">
+            <RefreshCw className="h-8 w-8 text-primary-500 animate-spin" />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-xl font-bold text-foreground">
+              {post?.mode === 'blog' ? '다이어리' : '블로그'}로 재생성 중...
+            </p>
+            <p className="text-sm text-foreground-muted">
+              같은 사진, 다른 감성으로 글을 다시 써드릴게요
+            </p>
+          </div>
+          <div className="h-1.5 w-64 bg-background-subtle rounded-full overflow-hidden">
+            <div className="h-full bg-primary-400 rounded-full animate-pulse w-3/4" />
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 animate-fade-in">
         {/* 블로그 본문 */}
         <div className="space-y-8">
@@ -341,6 +391,20 @@ export default function PostPage() {
               <Button className="w-full gap-2" onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4" />
                 {saving ? '저장 중...' : '저장하기'}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+              >
+                <RefreshCw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
+                {regenerating
+                  ? '재생성 중...'
+                  : post.mode === 'blog'
+                  ? '다이어리로 재생성'
+                  : '블로그로 재생성'}
               </Button>
 
               <Separator />
