@@ -19,7 +19,7 @@ export async function renderVideoOnLambda(props: VideoProps, webhookUrl?: string
   const siteName = process.env.REMOTION_SITE_NAME!;
   const bucketName = process.env.REMOTION_S3_BUCKET!;
 
-  const serveUrl = `https://s3.${region}.amazonaws.com/${bucketName}/sites/${siteName}/index.html`;
+  const serveUrl = `https://${bucketName}.s3.${region}.amazonaws.com/sites/${siteName}/index.html`;
   const compositionId = COMPOSITION_ID[props.format];
 
   const { renderId } = await renderMediaOnLambda({
