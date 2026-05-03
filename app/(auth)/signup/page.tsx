@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Leaf, Chrome } from 'lucide-react';
@@ -9,24 +9,31 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { signInWithGoogle, signUpWithEmail } from '@/lib/firebase/auth';
+import { signInWithGoogle, handleGoogleRedirectResult, signUpWithEmail } from '@/lib/firebase/auth';
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    setGoogleLoading(true);
+    handleGoogleRedirectResult()
+      .then((user) => { if (user) router.push('/dashboard'); })
+      .catch(() => toast.error('Google 로그인에 실패했어요.'))
+      .finally(() => setGoogleLoading(false));
+  }, [router]);
 
   async function handleGoogle() {
-    setLoading(true);
+    setGoogleLoading(true);
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
     } catch {
-      toast.error('Google 로그인에 실패했어요.');
-    } finally {
-      setLoading(false);
+      toast.error('Google 로그인을 시작할 수 없어요.');
+      setGoogleLoading(false);
     }
   }
 
@@ -37,7 +44,7 @@ export default function SignupPage() {
       toast.error('비밀번호는 6자 이상이어야 해요.');
       return;
     }
-    setLoading(true);
+    setEmailLoading(true);
     try {
       await signUpWithEmail(email, password, name);
       toast.success('가입 완료! 이메일 인증 메일을 확인해주세요.');
@@ -50,7 +57,7 @@ export default function SignupPage() {
         toast.error('회원가입에 실패했어요. 다시 시도해주세요.');
       }
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   }
 
@@ -71,10 +78,10 @@ export default function SignupPage() {
           variant="outline"
           className="w-full border-2 border-border bg-white text-foreground hover:bg-background-subtle gap-3 mb-4"
           onClick={handleGoogle}
-          disabled={loading}
+          disabled={googleLoading}
         >
           <Chrome className="h-4 w-4" />
-          Google로 계속하기
+          {googleLoading ? 'Google 연결 중...' : 'Google로 계속하기'}
         </Button>
 
         <div className="flex items-center gap-3 mb-4">
@@ -106,8 +113,8 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? '가입 중...' : '무료 시작하기'}
+          <Button type="submit" className="w-full" disabled={emailLoading}>
+            {emailLoading ? '가입 중...' : '무료 시작하기'}
           </Button>
         </form>
 
