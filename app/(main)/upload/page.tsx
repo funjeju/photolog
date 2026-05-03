@@ -63,6 +63,14 @@ export default function UploadPage() {
   const [generating, setGenerating] = useState(false);
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
 
+  // exifr는 GPSLatitude를 [도, 분, 초] 배열 또는 십진수로 반환 — 둘 다 처리
+  function dmsToDecimal(val: number | number[] | undefined): number | null {
+    if (val == null) return null;
+    if (typeof val === 'number') return val;
+    if (Array.isArray(val) && val.length >= 3) return val[0] + val[1] / 60 + val[2] / 3600;
+    return null;
+  }
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const processed = await Promise.all(
       acceptedFiles.slice(0, 30).map(async (file) => {
@@ -72,13 +80,16 @@ export default function UploadPage() {
             pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude', 'Make', 'Model'],
           });
           const model = exif?.Model ? String(exif.Model).trim() : (exif?.Make ? String(exif.Make).trim() : null);
-          const hasGps = !!(exif?.GPSLatitude && exif?.GPSLongitude);
+
+          const lat = dmsToDecimal(exif?.GPSLatitude);
+          const lng = dmsToDecimal(exif?.GPSLongitude);
+          const hasGps = lat !== null && lng !== null;
 
           let gpsAddress: string | null = null;
           if (hasGps) {
             try {
               const geoRes = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?lat=${exif.GPSLatitude}&lon=${exif.GPSLongitude}&format=json&accept-language=ko`,
+                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ko`,
                 { headers: { 'User-Agent': 'PhotoLog/1.0' } }
               );
               if (geoRes.ok) {

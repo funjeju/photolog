@@ -4,7 +4,7 @@ import { ApiErrors } from '@/lib/api/errors';
 import { adminDb } from '@/lib/firebase/admin';
 import { generateAndUploadTts } from '@/lib/video/tts-upload';
 import { renderVideoOnLambda } from '@/lib/video/render';
-import { FieldValue } from 'firebase-admin/firestore';
+
 import type { VideoFormat, VideoScene } from '@/remotion/types';
 import type { BgmKey } from '@/lib/video/bgm';
 
@@ -55,13 +55,30 @@ export async function POST(request: NextRequest) {
     location: s.location,
   }));
 
-  // 사용량 체크 (Pro 이상만 비디오 생성)
+  // 사용량 체크 — 실패·취소 제외하고 이번 달 실제 활성 영상만 카운트
   const userSnap = await adminDb.collection('users').doc(uid).get();
   const userData = userSnap.data() ?? {};
   const plan = userData.plan ?? 'free';
-  const videosThisMonth = userData.usage?.videosThisMonth ?? 0;
-  const videoLimit = plan === 'free' ? 1 : plan === 'pro' ? 30 : 100;
-  if (videosThisMonth >= videoLimit) return ApiErrors.usageExceeded();
+
+  if (plan !== 'admin') {
+    const videoLimit = plan === 'pro' ? 30 : plan === 'business' ? 100 : 3;
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const activeVideosSnap = await adminDb
+      .collection('users').doc(uid).collection('videos')
+      .where('createdAt', '>=', startOfMonth)
+      .get();
+
+    const activeCount = activeVideosSnap.docs.filter((d) => {
+      const s = d.data().status as string;
+      return s !== 'failed' && s !== 'cancelled';
+    }).length;
+
+    if (activeCount >= videoLimit) return ApiErrors.usageExceeded();
+  }
 
   // videos 도큐먼트 생성 (pending)
   const videoRef = adminDb.collection('users').doc(uid).collection('videos').doc();
@@ -98,10 +115,6 @@ export async function POST(request: NextRequest) {
 
     // post에 videoId 연결
     await postRef.update({ videoId: videoRef.id, updatedAt: new Date() });
-    // 사용량 증가
-    await adminDb.collection('users').doc(uid).update({
-      'usage.videosThisMonth': FieldValue.increment(1),
-    });
 
     return NextResponse.json({ videoId: videoRef.id, renderId, status: 'rendering' });
   } catch (err) {

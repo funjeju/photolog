@@ -13,7 +13,7 @@ import { clusterByLocation } from '@/lib/utils/clustering';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { PostMode } from '@/types/post';
 
-const PLAN_LIMITS = { free: 5, pro: 999, business: 999 };
+const PLAN_LIMITS: Record<string, number> = { free: 5, pro: 999, business: 999, admin: Infinity };
 
 async function checkAndIncrementUsage(uid: string, mode: PostMode): Promise<boolean> {
   const userRef = adminDb.collection('users').doc(uid);
@@ -21,7 +21,9 @@ async function checkAndIncrementUsage(uid: string, mode: PostMode): Promise<bool
   if (!user.exists) return false;
 
   const data = user.data()!;
-  const plan = (data.plan ?? 'free') as keyof typeof PLAN_LIMITS;
+  const plan = data.plan ?? 'free';
+  if (plan === 'admin') return true;
+
   const limit = PLAN_LIMITS[plan] ?? 5;
 
   const field = mode === 'blog' ? 'usage.blogPostsThisMonth' : 'usage.diaryEntriesThisMonth';
