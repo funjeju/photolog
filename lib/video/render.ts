@@ -33,7 +33,7 @@ export async function renderVideoOnLambda(props: VideoProps, webhookUrl?: string
     maxRetries: 1,
     privacy: 'public',
     outName: `render_${Date.now()}.mp4`,
-    webhook: webhookUrl ? { url: webhookUrl, secret: '' } : undefined,
+    webhook: webhookUrl ? { url: webhookUrl } : undefined,
   });
 
   return { renderId, bucketName };
