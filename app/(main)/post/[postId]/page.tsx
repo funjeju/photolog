@@ -141,6 +141,21 @@ function VideoGeneratingOverlay({
   );
 }
 
+function getAltText(photo: Photo): string {
+  const parts: string[] = [];
+  const dateVal = photo.capturedAt;
+  if (dateVal) {
+    const d = typeof (dateVal as { toDate?: () => Date }).toDate === 'function'
+      ? (dateVal as { toDate: () => Date }).toDate()
+      : new Date(dateVal as unknown as string);
+    parts.push(d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }));
+  }
+  if (photo.placeName) parts.push(photo.placeName);
+  else if (photo.address) parts.push(photo.address.split(' ').slice(0, 3).join(' '));
+  if (photo.visionDescription) parts.push(photo.visionDescription);
+  return parts.join(' ') || '사진';
+}
+
 function BlogSection({
   scene,
   photos,
@@ -154,16 +169,41 @@ function BlogSection({
 
   return (
     <div className="space-y-4">
+      {/* H2 소제목 */}
+      {scene.sectionTitle && (
+        <h2 className="text-lg font-semibold text-foreground leading-snug">
+          {scene.sectionTitle}
+        </h2>
+      )}
+
       {scenePhotos.length > 0 && (
         <div className={`grid gap-2 ${scenePhotos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
           {scenePhotos.map((photo) => (
-            <div
-              key={photo.photoId}
-              className="rounded-xl overflow-hidden bg-background-subtle"
-              style={{ aspectRatio: '4/3' }}
-            >
-              <img src={photo.downloadUrl} alt="" className="w-full h-full object-cover" />
-            </div>
+            <figure key={photo.photoId} className="m-0">
+              <div className="rounded-xl overflow-hidden bg-background-subtle" style={{ aspectRatio: '4/3' }}>
+                <img
+                  src={photo.downloadUrl}
+                  alt={getAltText(photo)}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {(photo.placeName || photo.capturedAt) && (
+                <figcaption className="text-xs text-foreground-subtle mt-1 px-0.5">
+                  {photo.placeName && <span>{photo.placeName}</span>}
+                  {photo.placeName && photo.capturedAt && <span> · </span>}
+                  {photo.capturedAt && (
+                    <span>
+                      {(() => {
+                        const d = typeof (photo.capturedAt as { toDate?: () => Date }).toDate === 'function'
+                          ? (photo.capturedAt as { toDate: () => Date }).toDate()
+                          : new Date(photo.capturedAt as unknown as string);
+                        return d.toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                      })()}
+                    </span>
+                  )}
+                </figcaption>
+              )}
+            </figure>
           ))}
         </div>
       )}
@@ -171,7 +211,7 @@ function BlogSection({
       <Textarea
         value={scene.narration}
         onChange={(e) => onNarrationChange(scene.id, e.target.value)}
-        className="min-h-[100px] text-base leading-loose border-0 bg-transparent px-0 resize-none focus-visible:ring-0 text-foreground"
+        className="min-h-[120px] text-base leading-loose border-0 bg-transparent px-0 resize-none focus-visible:ring-0 text-foreground"
         placeholder="내용을 입력하세요..."
       />
 

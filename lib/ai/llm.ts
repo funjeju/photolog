@@ -7,6 +7,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 type GeneratedPost = {
   title: string;
+  metaDescription?: string;
+  slug?: string;
   scenes: Scene[];
   tags: string[];
 };

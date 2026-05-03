@@ -20,6 +20,7 @@ export type Scene = {
   id: number;
   type: SceneType;
   photoIds: string[];
+  sectionTitle?: string;
   narration: string;
   subtitle: string;
   duration: number;
@@ -32,6 +33,8 @@ export type Post = {
   userId: string;
   mode: PostMode;
   title: string;
+  metaDescription?: string;
+  slug?: string;
   status: PostStatus;
   scenes: Scene[];
   totalPhotos: number;

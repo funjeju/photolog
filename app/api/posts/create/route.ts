@@ -92,6 +92,8 @@ export async function POST(request: NextRequest) {
       userId: uid,
       mode,
       title: generated.title,
+      metaDescription: generated.metaDescription ?? null,
+      slug: generated.slug ?? null,
       scenes: generated.scenes,
       status: 'completed',
       totalPhotos: photoUrls.length,

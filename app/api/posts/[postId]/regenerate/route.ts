@@ -75,6 +75,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   await postRef.update({
     mode,
     title: generated.title,
+    metaDescription: generated.metaDescription ?? null,
+    slug: generated.slug ?? null,
     scenes: generated.scenes,
     tags: generated.tags ?? [],
     generationOptions: { tone: effectiveTone, titleSource: 'auto' },
