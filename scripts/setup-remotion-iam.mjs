@@ -35,12 +35,17 @@ const INLINE_POLICY = JSON.stringify({
   Statement: [
     {
       Effect: 'Allow',
+      Action: ['s3:ListAllMyBuckets'],
+      Resource: '*',
+    },
+    {
+      Effect: 'Allow',
       Action: [
         's3:GetObject', 's3:PutObject', 's3:DeleteObject',
         's3:CreateBucket', 's3:ListBucket', 's3:GetBucketLocation',
         's3:PutBucketAcl', 's3:PutBucketOwnershipControls',
         's3:PutBucketPublicAccessBlock', 's3:GetBucketAcl',
-        's3:PutObjectAcl', 's3:GetObject',
+        's3:PutObjectAcl',
       ],
       Resource: ['arn:aws:s3:::remotionlambda-*', 'arn:aws:s3:::remotionlambda-*/*'],
     },
