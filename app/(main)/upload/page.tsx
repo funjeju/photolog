@@ -28,6 +28,7 @@ type PhotoFile = {
   capturedAt: Date | null;
   hasExif: boolean;
   hasGps: boolean;
+  gpsAddress: string | null;
   cameraModel: string | null;
 };
 
@@ -71,16 +72,37 @@ export default function UploadPage() {
             pick: ['DateTimeOriginal', 'GPSLatitude', 'GPSLongitude', 'Make', 'Model'],
           });
           const model = exif?.Model ? String(exif.Model).trim() : (exif?.Make ? String(exif.Make).trim() : null);
+          const hasGps = !!(exif?.GPSLatitude && exif?.GPSLongitude);
+
+          let gpsAddress: string | null = null;
+          if (hasGps) {
+            try {
+              const geoRes = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${exif.GPSLatitude}&lon=${exif.GPSLongitude}&format=json&accept-language=ko`,
+                { headers: { 'User-Agent': 'PhotoLog/1.0' } }
+              );
+              if (geoRes.ok) {
+                const geo = await geoRes.json();
+                const a = geo.address;
+                gpsAddress =
+                  a?.tourism || a?.amenity || a?.shop ||
+                  a?.road ||
+                  (a?.city || a?.town || a?.village || a?.county) || null;
+              }
+            } catch { /* 무시 */ }
+          }
+
           return {
             file,
             preview,
             capturedAt: exif?.DateTimeOriginal ? new Date(exif.DateTimeOriginal) : null,
             hasExif: !!exif?.DateTimeOriginal,
-            hasGps: !!(exif?.GPSLatitude && exif?.GPSLongitude),
+            hasGps,
+            gpsAddress,
             cameraModel: model,
           };
         } catch {
-          return { file, preview, capturedAt: null, hasExif: false, hasGps: false, cameraModel: null };
+          return { file, preview, capturedAt: null, hasExif: false, hasGps: false, gpsAddress: null, cameraModel: null };
         }
       })
     );
@@ -288,8 +310,8 @@ export default function UploadPage() {
                           )}
                           <div className="flex items-center gap-1.5 text-xs">
                             <MapPin className={cn('h-3 w-3 flex-shrink-0', photo.hasGps ? 'text-primary-300' : 'text-foreground-subtle')} />
-                            <span className={photo.hasGps ? 'text-foreground-muted' : 'text-foreground-subtle'}>
-                              {photo.hasGps ? 'GPS 있음' : 'GPS 없음'}
+                            <span className={cn('truncate', photo.hasGps ? 'text-foreground-muted' : 'text-foreground-subtle')}>
+                              {photo.hasGps ? (photo.gpsAddress ?? 'GPS 있음') : 'GPS 없음'}
                             </span>
                           </div>
                           {photo.cameraModel && (

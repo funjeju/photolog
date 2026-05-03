@@ -23,7 +23,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 export async function describeImage(imageUrl: string): Promise<VisionResult | null> {
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-2.5-flash',
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.4,
