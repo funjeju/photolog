@@ -1,31 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getOutputUrl } from '@/lib/video/render';
-import crypto from 'crypto';
-
-function verifyWebhookSignature(body: string, signature: string | null, secret: string): boolean {
-  if (!signature) return false;
-  try {
-    const expected = crypto.createHmac('sha512', secret).update(body).digest('hex');
-    const sigBuf = Buffer.from(signature, 'hex');
-    const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length === 0 || sigBuf.length !== expBuf.length) return false;
-    return crypto.timingSafeEqual(sigBuf, expBuf);
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
-  const secret = process.env.REMOTION_WEBHOOK_SECRET;
-
-  if (secret) {
-    const sig = request.headers.get('x-remotion-signature');
-    if (!verifyWebhookSignature(rawBody, sig, secret)) {
-      return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
-    }
-  }
 
   let payload: {
     type: 'success' | 'error' | 'timeout';
